@@ -1,26 +1,40 @@
- //Libraries utilized
+//Libraries utilized
 #include <LiquidCrystal_I2C.h>
 #include <SPI.h>
 #include <Wire.h>
-#include <DHT.h>
 #include <SD.h>
-#include <HX711.h>
+#include <Q2HX711.h>
+#include <DHT.h>
+#include <DHT_U.h>
+#include <WiFi.h>
+#include <WiFiClient.h>
+#include <WiFiServer.h>
+#include <WiFiUdp.h>
 
 //Component pins
 //SD card pins:
 const int chipSelect=8;
 //DHT pin:
-const int dhtPin=10;
+const int dhtPin=49;
 // relay pins:
-const int dehumidifier=4;
-const int humidifier=5;
-const int heater=6;
-const int cooler=7;
+const int dehumidifier=41;
+const int humidifier=43;
+const int heater=45;
+const int cooler=47;
 //scale callibration coefficient
 const float scaleCal=1;
+//ESP8266-07
+
 
 //global Data constants
-float weight;
+float weight1;
+float weight2;
+float weight3;
+float weight4;
+float weight5;
+float weight6;
+float weight7;
+float weight8;
 boolean dhtStatus;
 String dhtStatusString;
 float humidity;
@@ -33,22 +47,61 @@ float targetTemp=27.5;
 float hystTemp=2;
 float targetHumidity=50;
 float hystHumidity=10;
+const char* ssid     = "your-ssid";
+const char* password = "your-password";
 
 //Creating conponent opbjects
 DHT dht;
 LiquidCrystal_I2C lcd(0x27,16,2);  // set the LCD address
-HX711 scale(A1, A0, 64);
+HX711 scale1(A1, A0, 64);
+HX711 scale2(A3, A2, 64);
+HX711 scale3(A5, A4, 64);
+HX711 scale4(A7, A6, 64);
+HX711 scale5(A9, A8, 64);
+HX711 scale6(A11, A10, 64);
+HX711 scale7(A13, A12, 64);
+HX711 scale8(A15, A14, 64);
+
 
 //functions:
+
+//Connect to Wifi
+void setup() {
+  Serial.begin(115200);
+  delay(10);
+
+  // We start by connecting to a WiFi network
+
+  Serial.println();
+  Serial.println();
+  Serial.print("Connecting to ");
+  Serial.println(ssid);
+
+  /* Explicitly set the ESP8266 to be a WiFi-client, otherwise, it by default,
+     would try to act as both a client and an access-point and could cause
+     network-issues with your other WiFi-devices on your WiFi-network. */
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(ssid, password);
+
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+
+  Serial.println("");
+  Serial.println("WiFi connected");
+  Serial.println("IP address: ");
+  Serial.println(WiFi.localIP());
+}
 
 //returns seconds since start up
 unsigned long now(){
   return (millis()+500 - (millis()+500) % 1000)/1000;
   }
-  
+
 void initializeLoadCell(){
  lcd.clear();
- lcd.setCursor(0,0); 
+ lcd.setCursor(0,0);
  lcd.print("Scale Cal Coeff.");
  lcd.setCursor(1,1);
  lcd.print(scaleCal,2);
@@ -61,14 +114,14 @@ void initializeLoadCell(){
  scale.tare(30);
  lcd.clear();
  lcd.setCursor(1,1);
- lcd.print("Tare set"); 
+ lcd.print("Tare set");
  delay(5000);
 }
 
 void readLoadCell(){
   weight=scale.get_units(10);
 }
-  
+
 void readDHT(){
   humidity=0;
   temperature=0;
@@ -105,7 +158,7 @@ void displayData(){
   if(!dhtStatus){
     lcd.clear();
     lcd.setCursor(0,0);
-    lcd.print("Rel. Hum., Temp.");  
+    lcd.print("Rel. Hum., Temp.");
     lcd.setCursor(4,1);
     lcd.print(humidity,1);
     lcd.setCursor(8,1);
@@ -139,13 +192,14 @@ void writeData(){
     return;
   }
   //Opening the datafile
-  File dataFile = SD.open(datalogName, FILE_WRITE);  
+  File dataFile = SD.open(datalogName, FILE_WRITE);
   //if file and data is available data is written to the file
   if(!dhtStatus && dataFile){
     Serial.print(now());
     dataFile.print(now());
     Serial.print(" ");
     dataFile.print(" ");
+  //Print temperature and Humidity
     Serial.print(temperature,2);
     dataFile.print(temperature,2);
     Serial.print(" ");
@@ -154,10 +208,40 @@ void writeData(){
     dataFile.print(humidity,2);
     Serial.print(" ");
     dataFile.print(" ");
-    Serial.print(weight,2);
-    dataFile.print(weight,2);
+  //Print weightsensors 1-8
+    Serial.print(weight1,2);
+    dataFile.print(weight1,2);
     Serial.print(" ");
     dataFile.print(" ");
+    Serial.print(weight2,2);
+    dataFile.print(weight2,2);
+    Serial.print(" ");
+    dataFile.print(" ");
+    Serial.print(weight3,2);
+    dataFile.print(weight3,2);
+    Serial.print(" ");
+    dataFile.print(" ");
+    Serial.print(weight4,2);
+    dataFile.print(weight4,2);
+    Serial.print(" ");
+    dataFile.print(" ");
+    Serial.print(weight5,2);
+    dataFile.print(weight5,2);
+    Serial.print(" ");
+    dataFile.print(" ");
+    Serial.print(weight6,2);
+    dataFile.print(weight6,2);
+    Serial.print(" ");
+    dataFile.print(" ");
+    Serial.print(weight7,2);
+    dataFile.print(weight7,2);
+    Serial.print(" ");
+    dataFile.print(" ");
+    Serial.print(weight8,2);
+    dataFile.print(weight8,2);
+    Serial.print(" ");
+    dataFile.print(" ");
+  //Print relaystatus
     Serial.print(digitalRead(heater));
     dataFile.print(digitalRead(heater));
     Serial.print(" ");
@@ -184,7 +268,7 @@ void writeData(){
 
 void dataFileInitialization(){
   //String to write to line 1 in txt datafile
-  char* dataHeader = "time Temp Hum Weigth Heater Cooler Hum'er deHum'er";  
+  char* dataHeader = "time Temp Hum Weigth_1 Weight_2 Weight_3 Weight_4 Weight_5 Weight_6 Weight_7 Weight_8 Heater Cooler Hum'er deHum'er";
   // open or create the datafile.
   Serial.println("initializing sd card");
   int i=1; //counter
@@ -199,7 +283,7 @@ void dataFileInitialization(){
     datalogNameStr.toCharArray(datalogName,16);
   }
   //Create the logfile
-  File dataFile = SD.open(datalogName, FILE_WRITE); 
+  File dataFile = SD.open(datalogName, FILE_WRITE);
    // if the file is available, write to it:
   if (dataFile) {
     dataFile.println(dataHeader);
@@ -225,7 +309,7 @@ void dataFileInitialization(){
   }
 }
 
-//Loading the control data if available on the SD card 
+//Loading the control data if available on the SD card
 void loadControlParameters(){
   //Opening the datafile
   File dataFile = SD.open("Control/control.txt", FILE_READ);
@@ -245,10 +329,10 @@ void loadControlParameters(){
     //If a file isn't available restart the sd reader
     SD.begin(chipSelect);
   }
-  dataFile.close();   
+  dataFile.close();
   lcd.clear();
   lcd.setCursor(0,0);
-  lcd.print(" Targets:");  
+  lcd.print(" Targets:");
   lcd.setCursor(4,1);
   lcd.print(targetHumidity,1);
   lcd.setCursor(8,1);
@@ -297,7 +381,7 @@ void setRelays(){
   int humBand=control(humidity,targetHumidity,hystHumidity);
   //Checking status
   if(dhtStatus)return;
-  
+
   //Heater
   if(tempBand==0){
     digitalWrite(heater,HIGH);
@@ -308,7 +392,7 @@ void setRelays(){
   }else{
     digitalWrite(heater,LOW);
   }
-  
+
   //Cooler
   if(tempBand==3){
     digitalWrite(cooler,HIGH);
@@ -317,7 +401,7 @@ void setRelays(){
   }else{
     digitalWrite(cooler,LOW);
   }
-  
+
   //humidifier
   if(humBand==0){
     digitalWrite(humidifier,HIGH);
@@ -327,7 +411,7 @@ void setRelays(){
   }else{
     digitalWrite(humidifier,LOW);
   }
-  
+
   //dehumidifier
   if(humBand==3){
     digitalWrite(dehumidifier,HIGH);
@@ -342,7 +426,7 @@ void setRelays(){
 // the setup routine runs once when you press reset:
 void setup(){
   Serial.begin(9600);
-  delay(2000);  
+  delay(2000);
   //initializing components
   lcd.init();
   lcd.backlight();
@@ -355,7 +439,7 @@ void setup(){
   pinMode(cooler, OUTPUT);
   pinMode(heater, OUTPUT);
   //Datafile initialization
-  dataFileInitialization(); 
+  dataFileInitialization();
   //Control initialization
   loadControlParameters();
 }
@@ -374,6 +458,28 @@ void loop(){
     delay(2000); //saving data interfers with the dht
     saveCounter=0;
   }
+
+  //Send data to InfluxDb (https://goo.gl/AvktxY)
+  void loop() {
+  String line, temperature;
+
+  // wait 1 second
+  delay(1000);
+  
+  // get the current temperature from the sensor, to 2 decimal places
+  temperature = String(readDHT() 2);
+
+  // concatenate the temperature into the line protocol
+  //[key] [fields] [timestamp], The timestamp field (specified in nanoseconds from the epoch) is optional, so a sample point could look like this:
+  //temperature,device=arduino01 value=83.2
+  
+  line = String("temperature value=" + temperature, "humidity value=" + humidity, "weight 1 value=" + weight_1, "weight 2 value=" + weight_2, "weight 3 value=" + weight_3, "weight 4 value=" + weight_4, "weight 5 value=" + weight_5, "weight 6 value=" + weight_6, "weight 7 value=" + weight_7, "weight_8 value=" + weight_8, "heater state=" + digitalRead(heater), "cooler state=" + digitalRead(cooler), "humidifier state=" + digitalRead(humidifier), "dehumidifier state=" + digitalRead(dehumidifier));
+  Serial.println(line);
+  
+  // send the packet
+  Serial.println("Sending UDP packet...");
+  udp.beginPacket(host, port);
+  udp.print(line);
+  udp.endPacket();
+  }
 }
-
-
