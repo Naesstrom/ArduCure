@@ -1,3 +1,6 @@
+#include <SimpleDHT.h>
+#include <DHT.h>
+
 //Libraries utilized
 //DS3231 can be downloaded from http://www.rinkydinkelectronics.com/library.php?id=73
 #include <LiquidCrystal_I2C.h>
@@ -5,49 +8,19 @@
 #include <Wire.h>
 #include <SD.h>
 #include <Q2HX711.h>
-#include <DHT.h>
-//#include <DHT_U.h>
 #include <WiFi.h>
 #include <WiFiClient.h>
 #include <WiFiServer.h>
 #include <WiFiUdp.h>
 #include <DS3231.h>
+//This is the hx711 library available at https://github.com/bogde/HX711
+#include <HX711.h>
 
-
-
-#include "configuration.h"
-
+#include "configuration.h";
+#include "WiFi.h";
 
 //functions:
-
-//Connect to Wifi
-void setup() {
-  Serial.begin(115200);
-  delay(10);
-
-  // We start by connecting to a WiFi network
-
-  Serial.println();
-  Serial.println();
-  Serial.print("Connecting to ");
-  Serial.println(ssid);
-
-  /* Explicitly set the ESP8266 to be a WiFi-client, otherwise, it by default,
-     would try to act as both a client and an access-point and could cause
-     network-issues with your other WiFi-devices on your WiFi-network. */
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(ssid, password);
-
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-
-  Serial.println("");
-  Serial.println("WiFi connected");
-  Serial.println("IP address: ");
-  Serial.println(WiFi.localIP());
-}
+DHT dht(DHTPIN, DHTTYPE);
 
 //returns seconds since start up
 unsigned long now(){
@@ -60,13 +33,13 @@ void initializeLoadCell(){
  lcd.print("Scale Cal Coeff.");
  lcd.setCursor(1,1);
  lcd.print(scaleCal,2);
- scale.set_scale(scaleCal);
+ scale1.set_scale(scaleCal);
  delay(5000);
  lcd.clear();
  lcd.setCursor(0,0);
  lcd.print("Setting tare");
  delay(5000);
- scale.tare(30);
+ scale1.tare(30);
  lcd.clear();
  lcd.setCursor(1,1);
  lcd.print("Tare set");
@@ -74,39 +47,10 @@ void initializeLoadCell(){
 }
 
 void readLoadCell(){
-  weight=scale.get_units(10);
+  weight1=scale1.get_units(10);
 }
 
-void readDHT(){
-  humidity=0;
-  temperature=0;
-  int reads=0;
-  int whileCount=0;
-  //averaging three readings, for better accuracy
-  while(reads<3){
-    whileCount++;
-    delay(dht.getMinimumSamplingPeriod()+10);
-    //evaluating sensor status
-    dhtStatus=dht.getStatus();
-    dhtStatusString=dht.getStatusString();
-    //if status is ok sensor is read.
-    if(!dht.getStatus()){
-      reads++;
-      humidity +=dht.getHumidity();
-      temperature += dht.getTemperature();
-    }
-    //if sensor loop is run more than 5 times the function is exited
-    if(whileCount>5){
-      Serial.println("Sensor failed to read");
-      dht.setup(dhtPin);// reinitilizing sensor
-      dhtStatus=1; //sensor failed
-      return;
-    }
-  }
-  //averaging results
-    humidity = humidity/3;
-    temperature = temperature/3;
-}
+#include "read_dht.h";
 
 void displayData(){
   //if readings are comming through from the dht
@@ -127,7 +71,7 @@ void displayData(){
     lcd.setCursor(1,0);
     lcd.print("Weight");
     lcd.setCursor(2,1);
-    lcd.print(weight,2);
+    lcd.print(weight1,2);
     delay(1000);
   }else{
     lcd.clear();
@@ -385,7 +329,7 @@ void setup(){
   //initializing components
   lcd.init();
   lcd.backlight();
-  dht.setup(dhtPin);
+  dht.begin();
   SD.begin(chipSelect);
   initializeLoadCell();
   //relay initialization
